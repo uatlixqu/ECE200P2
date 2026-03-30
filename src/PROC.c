@@ -75,8 +75,17 @@ int main(int argc, char * argv[]) {
 	ProgramCounter = exec.GPC_START;
 	
 	/***************************/
-	/* ADD YOUR VARIABLES HERE */
+	/* ADD YOUR VARIABLES HERE
 	/***************************/
+	uint32_t opcode, rs, rt, rd, shamt, funct;
+	uint32_t imm, addr;
+	uint32_t nextPC;
+	int32_t simm;
+
+	int64_t mult_result;
+	uint64_t umult_result;
+	int32_t s_rs, s_rt;
+	uint32_t u_rs, u_rt;
 	
 
 	int i;
@@ -92,6 +101,63 @@ int main(int argc, char * argv[]) {
 		/********************************/
 		/* ADD YOUR IMPLEMENTATION HERE */
 		/********************************/
+		for(i = 0; i < MaxInstructions; i++) {
+
+			CurrentInstruction = readWord(ProgramCounter, false);
+
+			opcode = (CurrentInstruction >> 26) & 0x3F;
+			rs     = (CurrentInstruction >> 21) & 0x1F;
+			rt     = (CurrentInstruction >> 16) & 0x1F;
+			rd     = (CurrentInstruction >> 11) & 0x1F;
+			shamt  = (CurrentInstruction >> 6) & 0x1F;
+			funct  = CurrentInstruction & 0x3F;
+			imm    = CurrentInstruction & 0xFFFF;
+			addr   = CurrentInstruction & 0x03FFFFFF;
+
+			simm   = (int32_t)(int16_t)imm;
+			nextPC = ProgramCounter + 4;
+
+			u_rs = RegFile[rs];
+			u_rt = RegFile[rt];
+			s_rs = (int32_t)RegFile[rs];
+			s_rt = (int32_t)RegFile[rt];
+
+			switch(opcode) {
+
+				case 0x00:
+					switch(funct) {
+						case 0x20:   // add
+							RegFile[rd] = s_rs + s_rt;
+							break;
+
+						case 0x22:   // sub
+							RegFile[rd] = s_rs - s_rt;
+							break;
+
+						default:
+							break;
+					}
+					break;
+
+				case 0x08:   // addi
+					RegFile[rt] = s_rs + simm;
+					break;
+
+				case 0x23:   // lw
+					RegFile[rt] = readWord(u_rs + simm, false);
+					break;
+
+				case 0x2B:   // sw
+					writeWord(u_rs + simm, RegFile[rt], false);
+					break;
+
+				default:
+					break;
+			}
+
+			RegFile[0] = 0;
+			ProgramCounter = nextPC;
+		}
 
 
 	}   
