@@ -86,6 +86,8 @@ int main(int argc, char * argv[]) {
 	uint64_t umult_result;
 	int32_t s_rs, s_rt;
 	uint32_t u_rs, u_rt;
+
+	uint32_t eff_addr;
 	
 
 	int i;
@@ -101,63 +103,150 @@ int main(int argc, char * argv[]) {
 		/********************************/
 		/* ADD YOUR IMPLEMENTATION HERE */
 		/********************************/
-		for(i = 0; i < MaxInstructions; i++) {
+		
 
-			CurrentInstruction = readWord(ProgramCounter, false);
+		CurrentInstruction = readWord(ProgramCounter, false);
 
-			opcode = (CurrentInstruction >> 26) & 0x3F;
-			rs     = (CurrentInstruction >> 21) & 0x1F;
-			rt     = (CurrentInstruction >> 16) & 0x1F;
-			rd     = (CurrentInstruction >> 11) & 0x1F;
-			shamt  = (CurrentInstruction >> 6) & 0x1F;
-			funct  = CurrentInstruction & 0x3F;
-			imm    = CurrentInstruction & 0xFFFF;
-			addr   = CurrentInstruction & 0x03FFFFFF;
+		opcode = (CurrentInstruction >> 26) & 0x3F;
+		rs = (CurrentInstruction >> 21) & 0x1F;
+		rt = (CurrentInstruction >> 16) & 0x1F;
+		rd = (CurrentInstruction >> 11) & 0x1F;
+		shamt = (CurrentInstruction >> 6) & 0x1F;
+		funct = CurrentInstruction & 0x3F;
+		imm = CurrentInstruction & 0xFFFF;
+		addr = CurrentInstruction & 0x03FFFFFF;
 
-			simm   = (int32_t)(int16_t)imm;
-			nextPC = ProgramCounter + 4;
+		simm = (int32_t)(int16_t)imm;
+		nextPC = ProgramCounter + 4;
 
-			u_rs = RegFile[rs];
-			u_rt = RegFile[rt];
-			s_rs = (int32_t)RegFile[rs];
-			s_rt = (int32_t)RegFile[rt];
+		u_rs = RegFile[rs];
+		u_rt = RegFile[rt];
+		s_rs = (int32_t)RegFile[rs];
+		s_rt = (int32_t)RegFile[rt];
 
-			switch(opcode) {
+		switch(opcode) {
+			/**********************************************************/
+    		/* LOADS AND STORES----CHLOE LIU                          */
+    		/**********************************************************/
+			case 0x20:   // LB
+				eff_addr = u_rs + simm; //calculate addresss
+				
 
-				case 0x00:
-					switch(funct) {
-						case 0x20:   // add
-							RegFile[rd] = s_rs + s_rt;
-							break;
 
-						case 0x22:   // sub
-							RegFile[rd] = s_rs - s_rt;
-							break;
+				// 2. Read 1 byte from memory at that address
+				// 3. Sign-extend the byte to 32 bits
+				// 4. Store the result into RegFile[rt]
+				break;
 
-						default:
-							break;
-					}
-					break;
+			case 0x21:   // LH
+				// 1. Compute effective address
+				// 2. Read 2 bytes (halfword) from memory
+				// 3. Combine them into a 16-bit value using big-endian order
+				// 4. Sign-extend the halfword to 32 bits
+				// 5. Store the result into RegFile[rt]
+				break;
 
-				case 0x08:   // addi
-					RegFile[rt] = s_rs + simm;
-					break;
+			case 0x22:   // LWL
+				// 1. Compute effective address
+				// 2. Find the aligned word boundary containing that address
+				// 3. Read the full word from memory
+				// 4. Use the low 2 bits of the address to determine how many left-side bytes to load
+				// 5. Merge those bytes into the upper part of RegFile[rt]
+				// 6. Keep the remaining lower bytes of RegFile[rt] unchanged
+				break;
 
-				case 0x23:   // lw
-					RegFile[rt] = readWord(u_rs + simm, false);
-					break;
+			case 0x23:   // LW
+				// 1. Compute effective address
+				// 2. Read 1 full word from memory
+				// 3. Store it directly into RegFile[rt]
+				break;
 
-				case 0x2B:   // sw
-					writeWord(u_rs + simm, RegFile[rt], false);
-					break;
+			case 0x24:   // LBU
+				// 1. Compute effective address
+				// 2. Read 1 byte from memory
+				// 3. Zero-extend the byte to 32 bits
+				// 4. Store the result into RegFile[rt]
+				break;
 
-				default:
-					break;
-			}
+			case 0x25:   // LHU
+				// 1. Compute effective address
+				// 2. Read 2 bytes (halfword) from memory
+				// 3. Combine them into a 16-bit value using big-endian order
+				// 4. Zero-extend the halfword to 32 bits
+				// 5. Store the result into RegFile[rt]
+				break;
 
-			RegFile[0] = 0;
-			ProgramCounter = nextPC;
+			case 0x26:   // LWR
+				// 1. Compute effective address
+				// 2. Find the aligned word boundary containing that address
+				// 3. Read the full word from memory
+				// 4. Use the low 2 bits of the address to determine how many right-side bytes to load
+				// 5. Merge those bytes into the lower part of RegFile[rt]
+				// 6. Keep the remaining upper bytes of RegFile[rt] unchanged
+				break;
+
+			case 0x28:   // SB
+				// 1. Compute effective address
+				// 2. Take the lowest 8 bits of RegFile[rt]
+				// 3. Write that byte into memory
+				break;
+
+			case 0x29:   // SH
+				// 1. Compute effective address
+				// 2. Take the lowest 16 bits of RegFile[rt]
+				// 3. Split them into 2 bytes using big-endian order
+				// 4. Write those bytes into memory
+				break;
+
+			case 0x2A:   // SWL
+				// 1. Compute effective address
+				// 2. Find the aligned word boundary containing that address
+				// 3. Take the upper bytes from RegFile[rt]
+				// 4. Use the low 2 bits of the address to determine how many left-side bytes to store
+				// 5. Write those bytes into memory
+				break;
+
+			case 0x2B:   // SW
+				// 1. Compute effective address
+				// 2. Take the full 32-bit value from RegFile[rt]
+				// 3. Write the full word into memory
+				break;
+
+			case 0x2E:   // SWR
+				// 1. Compute effective address
+				// 2. Find the aligned word boundary containing that address
+				// 3. Take the lower bytes from RegFile[rt]
+				// 4. Use the low 2 bits of the address to determine how many right-side bytes to store
+				// 5. Write those bytes into memory
+				break;
+
+			/**********************************************************/
+    		/* ALU -------Ulizes                                     */
+    		/**********************************************************/
+
+			/**********************************************************/
+    		/* SHIFTS-----CHLOE LIU                                   */
+    		/**********************************************************/
+
+			/**********************************************************/
+    		/* MULTI AND DIVISION----Ulizes                           */
+    		/**********************************************************/
+
+			/**********************************************************/
+    		/* JUMP AND BRANCH------CHLOE LIU                         */
+    		/**********************************************************/
+
+			/**********************************************************/
+    		/* EXCEPTION-----Ulizes                                   */
+    		/**********************************************************/
+
+			default:
+				break;
 		}
+
+		RegFile[0] = 0;
+		ProgramCounter = nextPC;
+	
 
 
 	}   
