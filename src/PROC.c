@@ -89,6 +89,7 @@ int main(int argc, char * argv[]) {
 
 	uint32_t eff_addr;
 	
+	
 
 	int i;
 	for(i = 0; i < MaxInstructions; i++) {
@@ -103,8 +104,6 @@ int main(int argc, char * argv[]) {
 		/********************************/
 		/* ADD YOUR IMPLEMENTATION HERE */
 		/********************************/
-		
-
 		CurrentInstruction = readWord(ProgramCounter, false);
 
 		opcode = (CurrentInstruction >> 26) & 0x3F;
@@ -128,40 +127,49 @@ int main(int argc, char * argv[]) {
 			/**********************************************************/
     		/* LOADS AND STORES----CHLOE LIU                          */
     		/**********************************************************/
-			case 0x20:   // LB
+			case 0x20:{ // LB
 				eff_addr = u_rs + simm; //calculate addresss
-				
-
-
-				// 2. Read 1 byte from memory at that address
-				// 3. Sign-extend the byte to 32 bits
-				// 4. Store the result into RegFile[rt]
+				uint8_t val = readByte(eff_addr,false);
+				RegFile[rt] = (int32_t)(int8_t)val; // zero extend and load
 				break;
-
-			case 0x21:   // LH
-				// 1. Compute effective address
-				// 2. Read 2 bytes (halfword) from memory
-				// 3. Combine them into a 16-bit value using big-endian order
-				// 4. Sign-extend the halfword to 32 bits
-				// 5. Store the result into RegFile[rt]
+			}
+			case 0x21: {  // LH
+				eff_addr = u_rs + simm; //calculate address
+				uint8_t byte1,byte2;
+				byte1 = readByte(eff_addr,false);
+				byte2 = readByte(eff_addr+1,false);
+				uint16_t val =(byte1 << 8) | byte2; //adding the bytes to form the half word
+				RegFile[rt] = (int32_t)(int16_t)val; // zero-extent and load
 				break;
-
-			case 0x22:   // LWL
-				// 1. Compute effective address
-				// 2. Find the aligned word boundary containing that address
-				// 3. Read the full word from memory
-				// 4. Use the low 2 bits of the address to determine how many left-side bytes to load
-				// 5. Merge those bytes into the upper part of RegFile[rt]
-				// 6. Keep the remaining lower bytes of RegFile[rt] unchanged
+			}
+			case 0x22: {  // LWL
+				eff_addr = u_rs + simm; //calculate addresss
+				uint32_t offset_addr, val, offset;
+				offset_addr = eff_addr & ~0x3;
+				val = readWord(offset_addr,false);
+				offset = eff_addr & 0x3;
+				// different merging situations offset=0 to offset=3
+				if (offset == 0){
+					RegFile[rt] = val;
+				}
+				else if (offset == 1) {
+					RegFile[rt] = (val & 0xFFFFFF00) | (RegFile[rt] & 0x000000FF);
+				}
+				else if (offset == 2) {
+					RegFile[rt] = (val & 0xFFFF0000) | (RegFile[rt] & 0x0000FFFF);
+				}
+				else if (offset == 3) {
+					RegFile[rt] = (val & 0xFF000000) | (RegFile[rt] & 0x00FFFFFF);
+				}
 				break;
-
-			case 0x23:   // LW
-				// 1. Compute effective address
-				// 2. Read 1 full word from memory
-				// 3. Store it directly into RegFile[rt]
+			}
+			case 0x23: {  // LW
+				eff_addr = u_rs + simm; //calculate address
+				RegFile[rt] = readWord(eff_addr,false); //load
 				break;
-
+			}
 			case 0x24:   // LBU
+			
 				// 1. Compute effective address
 				// 2. Read 1 byte from memory
 				// 3. Zero-extend the byte to 32 bits
