@@ -172,21 +172,27 @@ int main(int argc, char * argv[]) {
 					/* R-TYPE SHIFTS ------ CHLOE LIU							   			*/
 					/************************************************************************/
 					case 0x00: { // R-TYPE INSTRUCTION - SLL
+						RegFile[rd] = (int32_t)((uint32_t)RegFile[rt] << shamt);
 						break;
 					}
 					case 0x02: { // R-TYPE INSTRUCTION - SRL
+						RegFile[rd] = (int32_t)((uint32_t)RegFile[rt] >> shamt);
 						break;
 					}
 					case 0x03: { // R-TYPE INSTRUCTION - SRA
+						RegFile[rd] = RegFile[rt] >> shamt;
 						break;
 					}
-					case 0x04: { // R-TYPE INSTRUCTION - SLLV
+					case 0x04: {   // SLLV
+						RegFile[rd] = (int32_t)((uint32_t)RegFile[rt] << (u_rs & 0x1F));
 						break;
 					}
 					case 0x06: { // R-TYPE INSTRUCTION - SRLV
+						RegFile[rd] = (int32_t)((uint32_t)RegFile[rt] >> (u_rs & 0x1F));
 						break;
 					}
 					case 0x07: { // R-TYPE INSTRUCTION - SRAV
+						RegFile[rd] = RegFile[rt] >> (u_rs & 0x1F);
 						break;
 					}
 
@@ -444,6 +450,7 @@ int main(int argc, char * argv[]) {
 				break;
 			}
 			case 0x04: { // I-TYPE INSTRUCTION - BEQ
+				
 				break;
 			}
 			case 0x05: { // I-TYPE INSTRUCTION - BNE
@@ -469,7 +476,6 @@ int main(int argc, char * argv[]) {
 			/************************************************************************/
     		/* EXCEPTION ------ ULIZES ATLIXQUENO                     				*/
     		/************************************************************************/
-
 			default:
 				break;
 		}
