@@ -89,6 +89,15 @@ int main(int argc, char * argv[]) {
 
 	uint32_t eff_addr;
 
+	//for branch delay slot
+	uint32_t target = 0;
+	int branch = 0;
+
+	//for load delay slot
+	int32_t load_val =0;
+	uint32_t load_reg=0;
+	int pending = 0;
+
 	/***************************/
 	/* END OF USER VARIABLES */
 	/***************************/
@@ -127,6 +136,16 @@ int main(int argc, char * argv[]) {
 		u_rt = RegFile[rt];									// Unsigned value of target register					
 		s_rs = (int32_t)RegFile[rs];
 		s_rt = (int32_t)RegFile[rt];
+		
+		//saving the previous branch variables
+		int delay_branch = branch;
+		uint32_t delay_target = target;
+		delay_branch = 0;
+		//saving the previous load variables
+		int apply_load = pending;
+		uint32_t apply_load_reg = load_reg;
+		int32_t apply_load_value = load_val;
+		pending = 0;
 
 		/* */
 
@@ -228,9 +247,14 @@ int main(int argc, char * argv[]) {
 					/* R-TYPE JUMP AND BRANCH ------ CHLOE LIU 					   			*/
 					/************************************************************************/
 					case 0x08: { // R-TYPE INSTRUCTION - JR
+						branch = 1;
+						target = (uint32_t)RegFile[rs];
 						break;
 					}
 					case 0x09: { // R-TYPE INSTRUCTION - JALR
+						RegFile[rd] = ProgramCounter +8;
+						branch = 1;
+						target = (uint32_t)RegFile[rs];
 						break;
 					}
 
@@ -240,83 +264,118 @@ int main(int argc, char * argv[]) {
 			/************************************************************************/
     		/* I-TYPE LOADS AND STORES ------ CHLOE LIU                          	*/
     		/************************************************************************/
-			case 0x20: { // I-TYPE INSTRUCTION - LB
-				eff_addr = u_rs + simm; //calculate addresss
-				uint8_t val = readByte(eff_addr,false);
-				RegFile[rt] = (int32_t)(int8_t)val; // zero extend and load
+			 case 0x20: {   // LB
+				eff_addr = u_rs + simm;
+				uint8_t val = readByte(eff_addr, false);
+
+				pending = 1;
+				load_reg = rt;
+				load_val = (int32_t)(int8_t)val;
+				break;
+        	}
+
+			case 0x21: {   // LH
+				eff_addr = u_rs + simm;
+				uint8_t byte1, byte2;
+
+				byte1 = readByte(eff_addr, false);
+				byte2 = readByte(eff_addr + 1, false);
+
+				uint16_t val = (byte1 << 8) | byte2;
+
+				pending = 1;
+				load_reg = rt;
+				load_val = (int32_t)(int16_t)val;
 				break;
 			}
-			case 0x21: { // I-TYPE INSTRUCTION - LH
-				eff_addr = u_rs + simm; //calculate address
-				uint8_t byte1,byte2;
-				byte1 = readByte(eff_addr,false);
-				byte2 = readByte(eff_addr+1,false);
-				uint16_t val =(byte1 << 8) | byte2; //adding the bytes to form the half word
-				RegFile[rt] = (int32_t)(int16_t)val; // zero-extent and load
-				break;
-			}
+
 			case 0x22: {   // LWL
 				uint32_t aligned_addr, val, offset;
+				int32_t result;
+
 				eff_addr = u_rs + simm;
 				aligned_addr = eff_addr & ~0x3;
 				val = readWord(aligned_addr, false);
 				offset = eff_addr & 0x3;
 
 				if (offset == 0) {
-					RegFile[rt] = (int32_t)val;
+					result = (int32_t)val;
 				}
 				else if (offset == 1) {
-					RegFile[rt] = (int32_t)((val << 8) | ((uint32_t)RegFile[rt] & 0x000000FF));
+					result = (int32_t)((val << 8) | ((uint32_t)RegFile[rt] & 0x000000FF));
 				}
 				else if (offset == 2) {
-					RegFile[rt] = (int32_t)((val << 16) | ((uint32_t)RegFile[rt] & 0x0000FFFF));
+					result = (int32_t)((val << 16) | ((uint32_t)RegFile[rt] & 0x0000FFFF));
 				}
-				else if (offset == 3) {
-					RegFile[rt] = (int32_t)((val << 24) | ((uint32_t)RegFile[rt] & 0x00FFFFFF));
+				else {
+					result = (int32_t)((val << 24) | ((uint32_t)RegFile[rt] & 0x00FFFFFF));
 				}
 
+				pending = 1;
+				load_reg = rt;
+				load_val = result;
 				break;
 			}
-			case 0x23: { // I-TYPE INSTRUCTION - LW
-				eff_addr = u_rs + simm; //calculate address
-				RegFile[rt] = readWord(eff_addr,false); //load
+
+			case 0x23: {   // LW
+				eff_addr = u_rs + simm;
+
+				pending = 1;
+				load_reg = rt;
+				load_val = (int32_t)readWord(eff_addr, false);
 				break;
 			}
-			case 0x24: { // I-TYPE INSTRUCTION - LBU
-				eff_addr = u_rs + simm; //calculate addresss
-				uint8_t val = readByte(eff_addr,false);
-				RegFile[rt] = (int32_t)val; // zero extend and load
+
+			case 0x24: {   // LBU
+				eff_addr = u_rs + simm;
+				uint8_t val = readByte(eff_addr, false);
+
+				pending = 1;
+				load_reg = rt;
+				load_val = (int32_t)val;
 				break;
 			}
-			case 0x25: { // I-TYPE INSTRUCTION - LHU
-				eff_addr = u_rs + simm; //calculate address
-				uint8_t byte1,byte2;
-				byte1 = readByte(eff_addr,false);
-				byte2 = readByte(eff_addr+1,false);
-				uint16_t val =(byte1 << 8) | byte2; //adding the bytes to form the half word
-				RegFile[rt] = (int32_t)val; // zero-extent and load
+
+			case 0x25: {   // LHU
+				eff_addr = u_rs + simm;
+				uint8_t byte1, byte2;
+
+				byte1 = readByte(eff_addr, false);
+				byte2 = readByte(eff_addr + 1, false);
+
+				uint16_t val = (byte1 << 8) | byte2;
+
+				pending = 1;
+				load_reg = rt;
+				load_val = (int32_t)val;
 				break;
 			}
+
 			case 0x26: {   // LWR
 				uint32_t aligned_addr, val, offset;
+				int32_t result;
+
 				eff_addr = u_rs + simm;
 				aligned_addr = eff_addr & ~0x3;
 				val = readWord(aligned_addr, false);
 				offset = eff_addr & 0x3;
 
 				if (offset == 0) {
-					RegFile[rt] = (int32_t)(((uint32_t)RegFile[rt] & 0xFFFFFF00) | (val >> 24));
+					result = (int32_t)((((uint32_t)RegFile[rt]) & 0xFFFFFF00) | (val >> 24));
 				}
 				else if (offset == 1) {
-					RegFile[rt] = (int32_t)(((uint32_t)RegFile[rt] & 0xFFFF0000) | (val >> 16));
+					result = (int32_t)((((uint32_t)RegFile[rt]) & 0xFFFF0000) | (val >> 16));
 				}
 				else if (offset == 2) {
-					RegFile[rt] = (int32_t)(((uint32_t)RegFile[rt] & 0xFF000000) | (val >> 8));
+					result = (int32_t)((((uint32_t)RegFile[rt]) & 0xFF000000) | (val >> 8));
 				}
-				else if (offset == 3) {
-					RegFile[rt] = (int32_t)val;
+				else {
+					result = (int32_t)val;
 				}
 
+				pending = 1;
+				load_reg = rt;
+				load_val = result;
 				break;
 			}
 			case 0x28: { // I-TYPE INSTRUCTION - SB
@@ -435,31 +494,64 @@ int main(int argc, char * argv[]) {
 			case 0x01: { // I-TYPE JUMP AND BRANCH INSTRUCTIONS  
 				switch(u_rt) {
 					case 0x00: { // I-TYPE INSTRUCTION - BLTZ
+						if (RegFile[rs] < 0){
+							branch = 1;
+							target = nextPC + (simm << 2);
+						}
 						break;
 					}
 					case 0x01: { // I-TYPE INSTRUCTION - BGEZ
+						if (RegFile[rs] >= 0){
+							branch = 1;
+							target = nextPC + (simm << 2);
+						}
 						break;
 					}
 					case 0x10: { // I-TYPE INSTRUCTION - BLTZAL
+						if (RegFile[rs] < 0){
+							RegFile[31] = ProgramCounter + 8;
+							branch = 1;
+							target = nextPC + (simm << 2);
+						}
 						break;
 					}
 					case 0x11: { // I-TYPE INSTRUCTION - BGEZAL
+						if (RegFile[rs] >= 0){
+							RegFile[31] = ProgramCounter + 8;
+							branch = 1;
+							target = nextPC + (simm << 2);
+						}
 						break;
 					}
 				}
 				break;
 			}
 			case 0x04: { // I-TYPE INSTRUCTION - BEQ
-				
+				if (RegFile[rs] == RegFile[rt]){
+					branch = 1;
+					target = nextPC + (simm << 2);
+				}
 				break;
 			}
 			case 0x05: { // I-TYPE INSTRUCTION - BNE
+				if (RegFile[rs] != RegFile[rt]){
+					branch = 1;
+					target = nextPC + (simm << 2);
+				}
 				break;
 			}
 			case 0x06: { // I-TYPE INSTRUCTION - BLEZ
+				if (RegFile[rs] <= 0){
+					branch = 1;
+					target = nextPC + (simm << 2);
+				}
 				break;
 			}
 			case 0x07: { // I-TYPE INSTRUCTION - BGTZ
+				if (RegFile[rs] > 0){
+					branch = 1;
+					target = nextPC + (simm << 2);
+				}
 				break;
 			}
 
@@ -467,9 +559,14 @@ int main(int argc, char * argv[]) {
 			/* J-TYPE JUMP AND BRANCH ------ CHLOE LIU 					   			*/
 			/************************************************************************/
 			case 0x02: { // J-TYPE INSTRUCTION - J
+				branch = 1;
+				target = (nextPC & 0xF0000000) | (addr << 2);
 				break;
 			}
 			case 0x03: { // J-TYPE INSTRUCTION - JAL
+				RegFile[31] = ProgramCounter + 8;
+				branch = 1;
+				target = (nextPC & 0xF0000000) | (addr << 2);
 				break;
 			}
 
@@ -479,13 +576,21 @@ int main(int argc, char * argv[]) {
 			default:
 				break;
 		}
-
+		//load delay slot
+		if (apply_load && apply_load_reg != 0) {
+			RegFile[apply_load_reg] = apply_load_value;
+		}
+		
 		RegFile[0] = 0;
-		ProgramCounter = nextPC;
-	
 
-
-	}   
+		//branch delay slot
+		if (delay_branch){
+			ProgramCounter = delay_target;
+		}
+		else {
+			ProgramCounter = nextPC;
+		}
+	}
 	//Print the final contents of the register file
 	printRegFile();
 	//Close file pointers & free allocated Memory
