@@ -134,19 +134,106 @@ int main(int argc, char * argv[]) {
 			/* R-TYPE INSTRUCTIONS */
 			case 0x00: {
 				switch(funct) {
-					/**************************************************************/
-					/* R-TYPE ALU ------ ULIZES ATLIXQUENO                        */
-					/**************************************************************/
-			
+					/************************************************************************/
+					/* R-TYPE ALU ------ ULIZES ATLIXQUENO                         			*/
+					/************************************************************************/
+					case 0x20: { // R-TYPE INSTRUCTION - ADD
+						break;
+					}
+					case 0x21: { // R-TYPE INSTRUCTION - ADDU
+						break;
+					}
+					case 0x22: { // R-TYPE INSTRUCTION - SUB
+						break;
+					}
+					case 0x23: { // R-TYPE INSTRUCTION - SUBU
+						break;
+					}
+					case 0x24: { // R-TYPE INSTRUCTION - AND
+						break;
+					}
+					case 0x25: { // R-TYPE INSTRUCTION - OR
+						break;
+					}
+					case 0x26: { // R-TYPE INSTRUCTION - XOR
+						break;
+					}
+					case 0x27: { // R-TYPE INSTRUCTION - NOR
+						break;
+					}
+					case 0x2A: { // R-TYPE INSTRUCTION - SLT
+						break;
+					}
+					case 0x2B: { // R-TYPE INSTRUCTION - SLTU
+						break;
+					}
+					
+					/************************************************************************/
+					/* R-TYPE SHIFTS ------ CHLOE LIU							   			*/
+					/************************************************************************/
+					case 0x00: { // R-TYPE INSTRUCTION - SLL
+						break;
+					}
+					case 0x02: { // R-TYPE INSTRUCTION - SRL
+						break;
+					}
+					case 0x03: { // R-TYPE INSTRUCTION - SRA
+						break;
+					}
+					case 0x04: { // R-TYPE INSTRUCTION - SLLV
+						break;
+					}
+					case 0x06: { // R-TYPE INSTRUCTION - SRLV
+						break;
+					}
+					case 0x07: { // R-TYPE INSTRUCTION - SRAV
+						break;
+					}
+
+					/************************************************************************/
+					/* R-TYPE MULTIPLICATION AND DIVISION ------ ULIZES ATLIXQUENO 			*/
+					/************************************************************************/
+					case 0x10: { //R-TYPE INSTRUCTION - MFHI
+						break;
+					}
+					case 0x11: { //R-TYPE INSTRUCTION - MTHI
+						break;
+					}
+					case 0x12: { //R-TYPE INSTRUCTION - MFLO
+						break;
+					}	
+					case 0x13: { //R-TYPE INSTRUCTION - MTLO
+						break;
+					}	
+					case 0x18: { // R-TYPE INSTRUCTION - MULT
+						break;
+					}
+					case 0x19: { // R-TYPE INSTRUCTION - MULTU
+						break;
+					}
+					case 0x1A: { // R-TYPE INSTRUCTION - DIV
+						break;
+					}
+					case 0x1B: { // R-TYPE INSTRUCTION - DIVU
+						break;
+					}
+
+					/************************************************************************/
+					/* R-TYPE JUMP AND BRANCH ------ CHLOE LIU 					   			*/
+					/************************************************************************/
+					case 0x08: { // R-TYPE INSTRUCTION - JR
+						break;
+					}
+					case 0x09: { // R-TYPE INSTRUCTION - JALR
+						break;
+					}
+
 				}
 			}
 
-			/* J-TYPE INSTRUCTIONS */
-			case 0x02: 
-
-			/**************************************************************/
-    		/* LOADS AND STORES ------ CHLOE LIU                          */
-    		/**************************************************************/
+			/************************************************************************/
+    		/* I-TYPE LOADS AND STORES ------ CHLOE LIU                          	*/
+    		/************************************************************************/
 			case 0x20: { // I-TYPE INSTRUCTION - LB
 				eff_addr = u_rs + simm; //calculate addresss
 				uint8_t val = readByte(eff_addr,false);
@@ -249,9 +336,9 @@ int main(int argc, char * argv[]) {
 				break;
 			}
 			
-			/************************************************************/
-    		/* I-TYPE ALU ------ ULIZES ATLIXQUENO 						*/
-    		/************************************************************/
+			/************************************************************************/
+    		/* I-TYPE ALU ------ ULIZES ATLIXQUENO 									*/
+    		/************************************************************************/
 			case 0x08: { // I-TYPE INSTRUCTION - ADDI
 				break;
 			}
@@ -270,28 +357,59 @@ int main(int argc, char * argv[]) {
 			case 0x0D: { // I-TYPE INSTRUCTION - ORI
 				break;
 			}
-			case 0x0E: {// I-TYPE INSTRUCTION - XORI
+			case 0x0E: { // I-TYPE INSTRUCTION - XORI
 				break;
 			}
 			case 0x0F: { // I-TYPE INSTRUCTION - LUI
 				break;
 			}
 
-			/**********************************************************/
-    		/* SHIFTS-----CHLOE LIU                                   */
-    		/**********************************************************/
+			/************************************************************************/
+			/* I-TYPE JUMP AND BRANCH ------ CHLOE LIU 					   			*/
+			/************************************************************************/
+			case 0x01: { // I-TYPE JUMP AND BRANCH INSTRUCTIONS  
+				switch(u_rt) {
+					case 0x00: { // I-TYPE INSTRUCTION - BLTZ
+						break;
+					}
+					case 0x01: { // I-TYPE INSTRUCTION - BGEZ
+						break;
+					}
+					case 0x10: { // I-TYPE INSTRUCTION - BLTZAL
+						break;
+					}
+					case 0x11: { // I-TYPE INSTRUCTION - BGEZAL
+						break;
+					}
+				}
+				break;
+			}
+			case 0x04: { // I-TYPE INSTRUCTION - BEQ
+				break;
+			}
+			case 0x05: { // I-TYPE INSTRUCTION - BNE
+				break;
+			}
+			case 0x06: { // I-TYPE INSTRUCTION - BLEZ
+				break;
+			}
+			case 0x07: { // I-TYPE INSTRUCTION - BGTZ
+				break;
+			}
 
-			/**********************************************************/
-    		/* MULTI AND DIVISION----Ulizes                           */
-    		/**********************************************************/
+			/************************************************************************/
+			/* J-TYPE JUMP AND BRANCH ------ CHLOE LIU 					   			*/
+			/************************************************************************/
+			case 0x02: { // J-TYPE INSTRUCTION - J
+				break;
+			}
+			case 0x03: { // J-TYPE INSTRUCTION - JAL
+				break;
+			}
 
-			/**********************************************************/
-    		/* JUMP AND BRANCH------CHLOE LIU                         */
-    		/**********************************************************/
-
-			/**********************************************************/
-    		/* EXCEPTION-----Ulizes                                   */
-    		/**********************************************************/
+			/************************************************************************/
+    		/* EXCEPTION ------ ULIZES ATLIXQUENO                     				*/
+    		/************************************************************************/
 
 			default:
 				break;
