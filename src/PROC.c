@@ -110,7 +110,7 @@ int main(int argc, char * argv[]) {
 
 		//Print contents of the register file after each instruction
 		
-		printRegFile();//only suggested for Debug, comment this line to reduce output
+		//printRegFile();//only suggested for Debug, comment this line to reduce output
 		
 		/********************************/
 		/* ADD YOUR IMPLEMENTATION HERE */
