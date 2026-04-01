@@ -88,8 +88,10 @@ int main(int argc, char * argv[]) {
 	uint32_t u_rs, u_rt;
 
 	uint32_t eff_addr;
-	
-	
+
+	/***************************/
+	/* END OF USER VARIABLES */
+	/***************************/
 
 	int i;
 	for(i = 0; i < MaxInstructions; i++) {
@@ -104,36 +106,54 @@ int main(int argc, char * argv[]) {
 		/********************************/
 		/* ADD YOUR IMPLEMENTATION HERE */
 		/********************************/
+
+		/* Fetch Current Instrcutions */
 		CurrentInstruction = readWord(ProgramCounter, false);
 
-		opcode = (CurrentInstruction >> 26) & 0x3F;
-		rs = (CurrentInstruction >> 21) & 0x1F;
-		rt = (CurrentInstruction >> 16) & 0x1F;
-		rd = (CurrentInstruction >> 11) & 0x1F;
-		shamt = (CurrentInstruction >> 6) & 0x1F;
-		funct = CurrentInstruction & 0x3F;
-		imm = CurrentInstruction & 0xFFFF;
-		addr = CurrentInstruction & 0x03FFFFFF;
+		/* Decode Current Instructions */
+		opcode = (CurrentInstruction >> 26) & 0x3F;			// Determine R/I/J, type instruction
+		rs = (CurrentInstruction >> 21) & 0x1F;				// R/I - Source Register Index
+		rt = (CurrentInstruction >> 16) & 0x1F;				// R/I - Target Register Index
+		rd = (CurrentInstruction >> 11) & 0x1F;				// R - Destination Register Index
+		shamt = (CurrentInstruction >> 6) & 0x1F;			// R - Shift Amount
+		funct = CurrentInstruction & 0x3F;					// R - Function Code
+		imm = CurrentInstruction & 0xFFFF;					// I - Immediate Value
+		addr = CurrentInstruction & 0x03FFFFFF;				// J - Jump Address 
 
-		simm = (int32_t)(int16_t)imm;
-		nextPC = ProgramCounter + 4;
+		simm = (int32_t)(int16_t)imm;						// Sign-extended immediate for I-type instructions
+		nextPC = ProgramCounter + 4;						// SAVE ADDRESS OF THE NEXT INSTRUCTION (FOR BRANCH AND JUMP CALCULATIONS)
 
-		u_rs = RegFile[rs];
-		u_rt = RegFile[rt];
+		u_rs = RegFile[rs];									// Unsigned value of source register
+		u_rt = RegFile[rt];									// Unsigned value of target register					
 		s_rs = (int32_t)RegFile[rs];
 		s_rt = (int32_t)RegFile[rt];
 
+		/* */
+
 		switch(opcode) {
-			/**********************************************************/
-    		/* LOADS AND STORES----CHLOE LIU                          */
-    		/**********************************************************/
-			case 0x20:{ // LB
+			/* R-TYPE INSTRUCTIONS */
+			case 0x00: {
+				switch(funct) {
+					/**************************************************************/
+					/* R-TYPE ALU ------ ULIZES ATLIXQUENO                        */
+					/**************************************************************/
+			
+				}
+			}
+
+			/* J-TYPE INSTRUCTIONS */
+			case 0x02: 
+
+			/**************************************************************/
+    		/* LOADS AND STORES ------ CHLOE LIU                          */
+    		/**************************************************************/
+			case 0x20: { // I-TYPE INSTRUCTION - LB
 				eff_addr = u_rs + simm; //calculate addresss
 				uint8_t val = readByte(eff_addr,false);
 				RegFile[rt] = (int32_t)(int8_t)val; // zero extend and load
 				break;
 			}
-			case 0x21: {  // LH
+			case 0x21: { // I-TYPE INSTRUCTION - LH
 				eff_addr = u_rs + simm; //calculate address
 				uint8_t byte1,byte2;
 				byte1 = readByte(eff_addr,false);
@@ -142,7 +162,7 @@ int main(int argc, char * argv[]) {
 				RegFile[rt] = (int32_t)(int16_t)val; // zero-extent and load
 				break;
 			}
-			case 0x22: {  // LWL
+			case 0x22: { // I-TYPE INSTRUCTION - LWL
 				eff_addr = u_rs + simm; //calculate addresss
 				uint32_t offset_addr, val, offset;
 				offset_addr = eff_addr & ~0x3;
@@ -163,28 +183,28 @@ int main(int argc, char * argv[]) {
 				}
 				break;
 			}
-			case 0x23: {  // LW
+			case 0x23: { // I-TYPE INSTRUCTION - LW
 				eff_addr = u_rs + simm; //calculate address
 				RegFile[rt] = readWord(eff_addr,false); //load
 				break;
 			}
-			case 0x24:   // LBU
+			case 0x24: { // I-TYPE INSTRUCTION - LBU
 			
 				// 1. Compute effective address
 				// 2. Read 1 byte from memory
 				// 3. Zero-extend the byte to 32 bits
 				// 4. Store the result into RegFile[rt]
 				break;
-
-			case 0x25:   // LHU
+			}
+			case 0x25: { // I-TYPE INSTRUCTION - LHU
 				// 1. Compute effective address
 				// 2. Read 2 bytes (halfword) from memory
 				// 3. Combine them into a 16-bit value using big-endian order
 				// 4. Zero-extend the halfword to 32 bits
 				// 5. Store the result into RegFile[rt]
 				break;
-
-			case 0x26:   // LWR
+		}
+			case 0x26: { // I-TYPE INSTRUCTION - LWR
 				// 1. Compute effective address
 				// 2. Find the aligned word boundary containing that address
 				// 3. Read the full word from memory
@@ -192,45 +212,70 @@ int main(int argc, char * argv[]) {
 				// 5. Merge those bytes into the lower part of RegFile[rt]
 				// 6. Keep the remaining upper bytes of RegFile[rt] unchanged
 				break;
-
-			case 0x28:   // SB
+			}
+			case 0x28: { // I-TYPE INSTRUCTION - SB
 				// 1. Compute effective address
 				// 2. Take the lowest 8 bits of RegFile[rt]
 				// 3. Write that byte into memory
 				break;
-
-			case 0x29:   // SH
+			}
+			case 0x29: { // I-TYPE INSTRUCTION - SH
 				// 1. Compute effective address
 				// 2. Take the lowest 16 bits of RegFile[rt]
 				// 3. Split them into 2 bytes using big-endian order
 				// 4. Write those bytes into memory
 				break;
-
-			case 0x2A:   // SWL
+		}
+			case 0x2A: { // I-TYPE INSTRUCTION - SWL
 				// 1. Compute effective address
 				// 2. Find the aligned word boundary containing that address
 				// 3. Take the upper bytes from RegFile[rt]
 				// 4. Use the low 2 bits of the address to determine how many left-side bytes to store
 				// 5. Write those bytes into memory
 				break;
-
-			case 0x2B:   // SW
+			}
+			case 0x2B: { // I-TYPE INSTRUCTION - SW
 				// 1. Compute effective address
 				// 2. Take the full 32-bit value from RegFile[rt]
 				// 3. Write the full word into memory
 				break;
-
-			case 0x2E:   // SWR
+		}
+			case 0x2E: { // I-TYPE INSTRUCTION - SWR
 				// 1. Compute effective address
 				// 2. Find the aligned word boundary containing that address
 				// 3. Take the lower bytes from RegFile[rt]
 				// 4. Use the low 2 bits of the address to determine how many right-side bytes to store
 				// 5. Write those bytes into memory
 				break;
-
-			/**********************************************************/
-    		/* ALU -------Ulizes                                     */
-    		/**********************************************************/
+			}
+			
+			/************************************************************/
+    		/* I-TYPE ALU ------ ULIZES ATLIXQUENO 						*/
+    		/************************************************************/
+			case 0x08: { // I-TYPE INSTRUCTION - ADDI
+				break;
+			}
+			case 0x09: { // I-TYPE INSTRUCTION - ADDIU
+				break;
+			}
+			case 0x0A: { // I-TYPE INSTRUCTION - SLTI
+				break;
+			}
+			case 0x0B: { // I-TYPE INSTRUCTION - SLTIU
+				break;
+			}
+			case 0x0C: { // I-TYPE INSTRUCTION - ANDI
+				break;
+			}
+			case 0x0D: { // I-TYPE INSTRUCTION - ORI
+				break;
+			}
+			case 0x0E: {// I-TYPE INSTRUCTION - XORI
+				break;
+			}
+			case 0x0F: { // I-TYPE INSTRUCTION - LUI
+				break;
+			}
 
 			/**********************************************************/
     		/* SHIFTS-----CHLOE LIU                                   */
