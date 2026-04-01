@@ -35,7 +35,7 @@ struct memElement{
     uint32_t addr;
     uint8_t  data;
     UT_hash_handle hh;
-} memElement;
+};
 
 
 typedef struct Exe_Format {
