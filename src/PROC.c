@@ -249,25 +249,26 @@ int main(int argc, char * argv[]) {
 				RegFile[rt] = (int32_t)(int16_t)val; // zero-extent and load
 				break;
 			}
-			case 0x22: { // I-TYPE INSTRUCTION - LWL
-				eff_addr = u_rs + simm; //calculate addresss
-				uint32_t offset_addr, val, offset;
-				offset_addr = eff_addr & ~0x3;
-				val = readWord(offset_addr,false);
+			case 0x22: {   // LWL
+				uint32_t aligned_addr, val, offset;
+				eff_addr = u_rs + simm;
+				aligned_addr = eff_addr & ~0x3;
+				val = readWord(aligned_addr, false);
 				offset = eff_addr & 0x3;
-				// different merging situations offset=0 to offset=3
-				if (offset == 0){
-					RegFile[rt] = val;
+
+				if (offset == 0) {
+					RegFile[rt] = (int32_t)val;
 				}
 				else if (offset == 1) {
-					RegFile[rt] = (val & 0xFFFFFF00) | (RegFile[rt] & 0x000000FF);
+					RegFile[rt] = (int32_t)((val << 8) | ((uint32_t)RegFile[rt] & 0x000000FF));
 				}
 				else if (offset == 2) {
-					RegFile[rt] = (val & 0xFFFF0000) | (RegFile[rt] & 0x0000FFFF);
+					RegFile[rt] = (int32_t)((val << 16) | ((uint32_t)RegFile[rt] & 0x0000FFFF));
 				}
 				else if (offset == 3) {
-					RegFile[rt] = (val & 0xFF000000) | (RegFile[rt] & 0x00FFFFFF);
+					RegFile[rt] = (int32_t)((val << 24) | ((uint32_t)RegFile[rt] & 0x00FFFFFF));
 				}
+
 				break;
 			}
 			case 0x23: { // I-TYPE INSTRUCTION - LW
@@ -276,63 +277,121 @@ int main(int argc, char * argv[]) {
 				break;
 			}
 			case 0x24: { // I-TYPE INSTRUCTION - LBU
-			
-				// 1. Compute effective address
-				// 2. Read 1 byte from memory
-				// 3. Zero-extend the byte to 32 bits
-				// 4. Store the result into RegFile[rt]
+				eff_addr = u_rs + simm; //calculate addresss
+				uint8_t val = readByte(eff_addr,false);
+				RegFile[rt] = (int32_t)val; // zero extend and load
 				break;
 			}
 			case 0x25: { // I-TYPE INSTRUCTION - LHU
-				// 1. Compute effective address
-				// 2. Read 2 bytes (halfword) from memory
-				// 3. Combine them into a 16-bit value using big-endian order
-				// 4. Zero-extend the halfword to 32 bits
-				// 5. Store the result into RegFile[rt]
+				eff_addr = u_rs + simm; //calculate address
+				uint8_t byte1,byte2;
+				byte1 = readByte(eff_addr,false);
+				byte2 = readByte(eff_addr+1,false);
+				uint16_t val =(byte1 << 8) | byte2; //adding the bytes to form the half word
+				RegFile[rt] = (int32_t)val; // zero-extent and load
 				break;
-		}
-			case 0x26: { // I-TYPE INSTRUCTION - LWR
-				// 1. Compute effective address
-				// 2. Find the aligned word boundary containing that address
-				// 3. Read the full word from memory
-				// 4. Use the low 2 bits of the address to determine how many right-side bytes to load
-				// 5. Merge those bytes into the lower part of RegFile[rt]
-				// 6. Keep the remaining upper bytes of RegFile[rt] unchanged
+			}
+			case 0x26: {   // LWR
+				uint32_t aligned_addr, val, offset;
+				eff_addr = u_rs + simm;
+				aligned_addr = eff_addr & ~0x3;
+				val = readWord(aligned_addr, false);
+				offset = eff_addr & 0x3;
+
+				if (offset == 0) {
+					RegFile[rt] = (int32_t)(((uint32_t)RegFile[rt] & 0xFFFFFF00) | (val >> 24));
+				}
+				else if (offset == 1) {
+					RegFile[rt] = (int32_t)(((uint32_t)RegFile[rt] & 0xFFFF0000) | (val >> 16));
+				}
+				else if (offset == 2) {
+					RegFile[rt] = (int32_t)(((uint32_t)RegFile[rt] & 0xFF000000) | (val >> 8));
+				}
+				else if (offset == 3) {
+					RegFile[rt] = (int32_t)val;
+				}
+
 				break;
 			}
 			case 0x28: { // I-TYPE INSTRUCTION - SB
-				// 1. Compute effective address
-				// 2. Take the lowest 8 bits of RegFile[rt]
-				// 3. Write that byte into memory
+				uint8_t val;
+				eff_addr = u_rs + simm;
+				val = (uint8_t)(RegFile[rt] & 0xFF);
+				writeByte(eff_addr, val, false);
+
+				break;
+
+			}
+			case 0x29: {   // SH
+				uint16_t half_val;
+				uint8_t byte1, byte2;
+
+				eff_addr = u_rs + simm;
+				half_val = (uint16_t)(RegFile[rt] & 0xFFFF);
+
+				byte1 = (uint8_t)(half_val >> 8);
+				byte2 = (uint8_t)(half_val & 0xFF);
+
+				writeByte(eff_addr, byte1, false);
+				writeByte(eff_addr + 1, byte2, false);
+
 				break;
 			}
-			case 0x29: { // I-TYPE INSTRUCTION - SH
-				// 1. Compute effective address
-				// 2. Take the lowest 16 bits of RegFile[rt]
-				// 3. Split them into 2 bytes using big-endian order
-				// 4. Write those bytes into memory
-				break;
-		}
-			case 0x2A: { // I-TYPE INSTRUCTION - SWL
-				// 1. Compute effective address
-				// 2. Find the aligned word boundary containing that address
-				// 3. Take the upper bytes from RegFile[rt]
-				// 4. Use the low 2 bits of the address to determine how many left-side bytes to store
-				// 5. Write those bytes into memory
+			case 0x2A: {   // SWL
+				uint32_t aligned_addr, offset, reg_val, mem_val, new_val;
+
+				eff_addr = u_rs + simm;
+				aligned_addr = eff_addr & ~0x3;
+				offset = eff_addr & 0x3;
+
+				reg_val = (uint32_t)RegFile[rt];
+				mem_val = readWord(aligned_addr, false);
+
+				if (offset == 0) {
+					new_val = reg_val;
+				}
+				else if (offset == 1) {
+					new_val = (mem_val & 0xFF000000) | (reg_val >> 8);
+				}
+				else if (offset == 2) {
+					new_val = (mem_val & 0xFFFF0000) | (reg_val >> 16);
+				}
+				else {   // offset == 3
+					new_val = (mem_val & 0xFFFFFF00) | (reg_val >> 24);
+				}
+
+				writeWord(aligned_addr, new_val, false);
 				break;
 			}
-			case 0x2B: { // I-TYPE INSTRUCTION - SW
-				// 1. Compute effective address
-				// 2. Take the full 32-bit value from RegFile[rt]
-				// 3. Write the full word into memory
+			case 0x2B: {   // SW
+				eff_addr = u_rs + simm;
+				writeWord(eff_addr, (uint32_t)RegFile[rt], false);
 				break;
-		}
-			case 0x2E: { // I-TYPE INSTRUCTION - SWR
-				// 1. Compute effective address
-				// 2. Find the aligned word boundary containing that address
-				// 3. Take the lower bytes from RegFile[rt]
-				// 4. Use the low 2 bits of the address to determine how many right-side bytes to store
-				// 5. Write those bytes into memory
+			}
+			case 0x2E: {   // SWR
+				uint32_t aligned_addr, offset, reg_val, mem_val, new_val;
+
+				eff_addr = u_rs + simm;
+				aligned_addr = eff_addr & ~0x3;
+				offset = eff_addr & 0x3;
+
+				reg_val = (uint32_t)RegFile[rt];
+				mem_val = readWord(aligned_addr, false);
+
+				if (offset == 0) {
+					new_val = (mem_val & 0x00FFFFFF) | (reg_val << 24);
+				}
+				else if (offset == 1) {
+					new_val = (mem_val & 0x0000FFFF) | (reg_val << 16);
+				}
+				else if (offset == 2) {
+					new_val = (mem_val & 0x000000FF) | (reg_val << 8);
+				}
+				else {   // offset == 3
+					new_val = reg_val;
+				}
+
+				writeWord(aligned_addr, new_val, false);
 				break;
 			}
 			
