@@ -111,23 +111,7 @@ int main(int argc, char * argv[]) {
 		//Print contents of the register file after each instruction
 		
 		//printRegFile();//only suggested for Debug, comment this line to reduce output
-		if ((opcode == 0x08) ||                          /* ADDI */
-    (opcode == 0x00 && funct == 0x20) ||        /* ADD  */
-    (opcode == 0x00 && funct == 0x22) ||        /* SUB  */
-    (opcode == 0x00 && funct == 0x26) ||        /* XOR  */
-    (opcode == 0x00 && funct == 0x00) ||        /* SLL  */
-    (opcode == 0x00 && funct == 0x02) ||        /* SRL  */
-    (opcode == 0x00 && funct == 0x18) ||        /* MULT */
-    (opcode == 0x00 && funct == 0x1A) ||        /* DIV  */
-    (opcode == 0x00 && funct == 0x12) ||        /* MFLO */
-    (opcode == 0x00 && funct == 0x10)) {        /* MFHI */
-
-    printf("PC=%08x op=%02x fn=%02x | r1=%u r2=%u r3=%u r4=%u r6=%u r8=%u r9=%u r19=%u hi=%u lo=%u\n",
-           ProgramCounter, opcode, funct,
-           RegFile[1], RegFile[2], RegFile[3], RegFile[4],
-           RegFile[6], RegFile[8], RegFile[9], RegFile[19],
-           RegFile[32], RegFile[33]);
-}
+		
 		/********************************/
 		/* ADD YOUR IMPLEMENTATION HERE */
 		/********************************/
@@ -156,7 +140,7 @@ int main(int argc, char * argv[]) {
 		//saving the previous branch variables
 		int delay_branch = branch;
 		uint32_t delay_target = target;
-		delay_branch = 0;
+		branch = 0;
 		//saving the previous load variables
 		int apply_load = pending;
 		uint32_t apply_load_reg = load_reg;
@@ -348,6 +332,7 @@ int main(int argc, char * argv[]) {
 						return 0;
 					}
 				}
+				break;
 			}
 
 			/************************************************************************/
@@ -571,7 +556,7 @@ int main(int argc, char * argv[]) {
 			}
 			case 0x0B: { // I-TYPE INSTRUCTION - SLTIU
 				if(rt != 0) {
-					if(RegFile[rs] < (uint32_t)(int32_t)simm) {
+					if((uint32_t)RegFile[rs] < (uint32_t)(int32_t)simm) {
 						RegFile[rt] = 1;
 					}
 					else {
@@ -582,19 +567,19 @@ int main(int argc, char * argv[]) {
 			}
 			case 0x0C: { // I-TYPE INSTRUCTION - ANDI
 				if(rt != 0) {
-					RegFile[rt] = RegFile[rs] & (uint32_t)simm;
+					RegFile[rt] = RegFile[rs] & imm;
 				}
 				break;
 			}
 			case 0x0D: { // I-TYPE INSTRUCTION - ORI
 				if(rt != 0) {
-					RegFile[rt] = RegFile[rs] | (uint32_t)simm;
+					RegFile[rt] = RegFile[rs] | imm;
 				}
 				break;
 			}
 			case 0x0E: { // I-TYPE INSTRUCTION - XORI
 				if(rt != 0) {
-					RegFile[rt] = RegFile[rs] ^ (uint32_t)simm;
+					RegFile[rt] = RegFile[rs] ^ imm;
 				}
 				break;
 			}
