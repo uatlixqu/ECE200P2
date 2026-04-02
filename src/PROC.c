@@ -111,11 +111,19 @@ int main(int argc, char * argv[]) {
 		//Print contents of the register file after each instruction
 		
 		//printRegFile();//only suggested for Debug, comment this line to reduce output
-		printf("PC=%08x instr=%08x op=%02x fn=%02x | r1=%u r2=%u r3=%u r4=%u r6=%u r8=%u r19=%u HI=%u LO=%u\n",
-			ProgramCounter, CurrentInstruction, opcode, funct,
-			RegFile[1], RegFile[2], RegFile[3], RegFile[4],
-			RegFile[6], RegFile[8], RegFile[19], RegFile[32], RegFile[33]);
-
+		if (ProgramCounter == 0x00400010 ||
+    ProgramCounter == 0x00400018 ||
+    ProgramCounter == 0x00400040 ||
+    ProgramCounter == 0x00400044 ||
+    ProgramCounter == 0x00400058 ||
+    ProgramCounter == 0x00400060 ||
+    ProgramCounter == 0x00400064 ||
+    ProgramCounter == 0x00400068) {
+    printf("pc=%08x instr=%08x | r1=%u r2=%u r3=%u r4=%u r6=%u r8=%u r19=%u hi=%u lo=%u\n",
+           ProgramCounter, CurrentInstruction,
+           RegFile[1], RegFile[2], RegFile[3], RegFile[4],
+           RegFile[6], RegFile[8], RegFile[19], RegFile[32], RegFile[33]);
+}
 		/********************************/
 		/* ADD YOUR IMPLEMENTATION HERE */
 		/********************************/
