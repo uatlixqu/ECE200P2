@@ -594,7 +594,7 @@ int main(int argc, char * argv[]) {
 			/* I-TYPE JUMP AND BRANCH ------ CHLOE LIU 					   			*/
 			/************************************************************************/
 			case 0x01: { // I-TYPE JUMP AND BRANCH INSTRUCTIONS  
-				switch(u_rt) {
+				switch(rt) {
 					case 0x00: { // I-TYPE INSTRUCTION - BLTZ
 						if (RegFile[rs] < 0){
 							branch = 1;
