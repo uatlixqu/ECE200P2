@@ -30,34 +30,28 @@ int main(int argc, char * argv[]) {
 	 */
 	uint32_t CurrentInstruction;
 
-	//IF THE USER HAS NOT SPECIFIED ENOUGH COMMAND LINE ARUGMENTS
+	/* IF THE USER HAS NOT SPECIFIED ENOUGH COMMAND LINE ARGUMENTS */
 	if(argc < 3){
-
-		//PRINT ERROR AND TERMINATE
 		fprintf(stderr, "ERROR: Input argument missing!\n");
 		fprintf(stderr, "Expected: file-name, max-instructions\n");
 		return -1;
-
 	}
 
-     	//CONVERT MAX INSTRUCTIONS FROM STRING TO INTEGER	
-	MaxInstructions = atoi(argv[2]);	
+	/* CONVERT MAX INSTRUCTIONS FROM STRING TO INTEGER */
+	MaxInstructions = (uint32_t)atoi(argv[2]);
 
-	//Open file pointers & initialize Heap & Regsiters
+	/* Open file pointers & initialize Heap & Registers */
 	initHeap();
 	initFDT();
 	initRegFile(0);
 
-	//LOAD ELF FILE INTO MEMORY AND STORE EXIT STATUS
-	int status = LoadOSMemory(argv[1]);
-
-	//IF LOADING FILE RETURNED NEGATIVE EXIT STATUS
-	if(status < 0){ 
-		
-		//PRINT ERROR AND TERMINATE
-		fprintf(stderr, "ERROR: Unable to open file at %s!\n", argv[1]);
-		return status; 
-	
+	/* LOAD ELF FILE INTO MEMORY AND STORE EXIT STATUS */
+	{
+		int status = LoadOSMemory(argv[1]);
+		if(status < 0){
+			fprintf(stderr, "ERROR: Unable to open file at %s!\n", argv[1]);
+			return status;
+		}
 	}
 
 	printf("\n ----- BOOT Sequence ----- \n");
@@ -70,631 +64,450 @@ int main(int argc, char * argv[]) {
 	printRegFile();
 
 	printf("\n ----- Execute Program ----- \n");
-	printf("Max Instruction to run = %d \n",MaxInstructions);
+	printf("Max Instruction to run = %u \n", MaxInstructions);
 	fflush(stdout);
 	ProgramCounter = exec.GPC_START;
-	
+
 	/***************************/
-	/* ADD YOUR VARIABLES HERE
+	/* EXECUTION VARIABLES     */
 	/***************************/
-	uint32_t opcode, rs, rt, rd, shamt, funct;
-	uint32_t imm, addr;
-	uint32_t nextPC;
-	int32_t simm;
+	uint32_t opcode = 0, rs = 0, rt = 0, rd = 0, shamt = 0, funct = 0;
+	uint32_t imm = 0, addr = 0;
+	uint32_t nextPC = 0;
+	int32_t  simm = 0;
 
-	int64_t mult_result;
-	uint64_t umult_result;
-	int32_t s_rs, s_rt;
-	uint32_t u_rs, u_rt;
+	int32_t  s_rs = 0, s_rt = 0;
+	uint32_t u_rs = 0, u_rt = 0;
+	uint32_t eff_addr = 0;
 
-	uint32_t eff_addr;
-
-	//for branch delay slot
+	/* branch delay slot support */
 	uint32_t target = 0;
 	int branch = 0;
 
-	//for load delay slot
-	int32_t load_val =0;
-	uint32_t load_reg=0;
+	/* load delay slot support */
+	int32_t  load_val = 0;
+	uint32_t load_reg = 0;
 	int pending = 0;
 
-	/***************************/
-	/* END OF USER VARIABLES */
-	/***************************/
-
 	int i;
-	for(i = 0; i < MaxInstructions; i++) {
+	for(i = 0; i < (int)MaxInstructions; i++) {
 
-		//FETCH THE INSTRUCTION AT 'ProgramCounter'		
-		CurrentInstruction = readWord(ProgramCounter,false);
-
-		//Print contents of the register file after each instruction
-		
-		//printRegFile();//only suggested for Debug, comment this line to reduce output
-		
-		/********************************/
-		/* ADD YOUR IMPLEMENTATION HERE */
-		/********************************/
-
-		/* Fetch Current Instrcutions */
+		/* Fetch Current Instruction */
 		CurrentInstruction = readWord(ProgramCounter, false);
 
-		/* Decode Current Instructions */
-		opcode = (CurrentInstruction >> 26) & 0x3F;			// Determine R/I/J, type instruction
-		rs = (CurrentInstruction >> 21) & 0x1F;				// R/I - Source Register Index
-		rt = (CurrentInstruction >> 16) & 0x1F;				// R/I - Target Register Index
-		rd = (CurrentInstruction >> 11) & 0x1F;				// R - Destination Register Index
-		shamt = (CurrentInstruction >> 6) & 0x1F;			// R - Shift Amount
-		funct = CurrentInstruction & 0x3F;					// R - Function Code
-		imm = CurrentInstruction & 0xFFFF;					// I - Immediate Value
-		addr = CurrentInstruction & 0x03FFFFFF;				// J - Jump Address 
+		/* Decode Current Instruction */
+		opcode = (CurrentInstruction >> 26) & 0x3F;
+		rs     = (CurrentInstruction >> 21) & 0x1F;
+		rt     = (CurrentInstruction >> 16) & 0x1F;
+		rd     = (CurrentInstruction >> 11) & 0x1F;
+		shamt  = (CurrentInstruction >>  6) & 0x1F;
+		funct  =  CurrentInstruction        & 0x3F;
+		imm    =  CurrentInstruction        & 0xFFFF;
+		addr   =  CurrentInstruction        & 0x03FFFFFF;
 
-		simm = (int32_t)(int16_t)imm;						// Sign-extended immediate for I-type instructions
-		nextPC = ProgramCounter + 4;						// SAVE ADDRESS OF THE NEXT INSTRUCTION (FOR BRANCH AND JUMP CALCULATIONS)
+		simm   = (int32_t)(int16_t)imm;
+		nextPC = ProgramCounter + 4;
 
-		u_rs = RegFile[rs];									// Unsigned value of source register
-		u_rt = RegFile[rt];									// Unsigned value of target register					
-		s_rs = (int32_t)RegFile[rs];						// Signed value of source register
-		s_rt = (int32_t)RegFile[rt];						// Signed value of target register	
-		
-		//saving the previous branch variables
+		u_rs = (uint32_t)RegFile[rs];
+		u_rt = (uint32_t)RegFile[rt];
+		s_rs = (int32_t)RegFile[rs];
+		s_rt = (int32_t)RegFile[rt];
+
+		/* Save previous pending branch/load so current instruction becomes the delay-slot instruction. */
 		int delay_branch = branch;
 		uint32_t delay_target = target;
 		branch = 0;
-		//saving the previous load variables
+
 		int apply_load = pending;
 		uint32_t apply_load_reg = load_reg;
 		int32_t apply_load_value = load_val;
 		pending = 0;
 
-		/* */
-
 		switch(opcode) {
 			/* R-TYPE INSTRUCTIONS */
 			case 0x00: {
 				switch(funct) {
-					/************************************************************************/
-					/* R-TYPE ALU ------ ULIZES ATLIXQUENO                         			*/
-					/************************************************************************/
-					case 0x20: { // R-TYPE INSTRUCTION - ADD
-						if(rd != 0) {
-							RegFile[rd] = (s_rs) + s_rt;
-						}
+					/* R-TYPE ALU */
+					case 0x20: /* ADD */
+						if(rd != 0) RegFile[rd] = s_rs + s_rt;
 						break;
-					}
-					case 0x21: { // R-TYPE INSTRUCTION - ADDU
-						if(rd != 0) {
-							RegFile[rd] = RegFile[rs] + RegFile[rt];
-						}
+					case 0x21: /* ADDU */
+						if(rd != 0) RegFile[rd] = RegFile[rs] + RegFile[rt];
 						break;
-					}
-					case 0x22: { // R-TYPE INSTRUCTION - SUB
-						if(rd != 0) {
-							RegFile[rd] = (int32_t)RegFile[rs] - (int32_t)RegFile[rt];
-						}
+					case 0x22: /* SUB */
+						if(rd != 0) RegFile[rd] = s_rs - s_rt;
 						break;
-					}
-					case 0x23: { // R-TYPE INSTRUCTION - SUBU
-						if(rd != 0) {
-							RegFile[rd] = RegFile[rs] - RegFile[rt];
-						}
+					case 0x23: /* SUBU */
+						if(rd != 0) RegFile[rd] = RegFile[rs] - RegFile[rt];
 						break;
-					}
-					case 0x24: { // R-TYPE INSTRUCTION - AND
-						if(rd != 0) {
-							RegFile[rd] = RegFile[rs] & RegFile[rt];
-						}
+					case 0x24: /* AND */
+						if(rd != 0) RegFile[rd] = RegFile[rs] & RegFile[rt];
 						break;
-					}
-					case 0x25: { // R-TYPE INSTRUCTION - OR
-						if(rd != 0) {
-							RegFile[rd] = RegFile[rs] | RegFile[rt];
-						}
+					case 0x25: /* OR */
+						if(rd != 0) RegFile[rd] = RegFile[rs] | RegFile[rt];
 						break;
-					}
-					case 0x26: { // R-TYPE INSTRUCTION - XOR
-							RegFile[rd] = RegFile[rs] ^ RegFile[rt];
+					case 0x26: /* XOR */
+						if(rd != 0) RegFile[rd] = RegFile[rs] ^ RegFile[rt];
 						break;
-					}
-					case 0x27: { // R-TYPE INSTRUCTION - NOR
-						if(rd != 0) {
-							RegFile[rd] = ~(RegFile[rs] | RegFile[rt]);
-						}
+					case 0x27: /* NOR */
+						if(rd != 0) RegFile[rd] = ~(RegFile[rs] | RegFile[rt]);
 						break;
-					}
-					case 0x2A: { // R-TYPE INSTRUCTION - SLT
-						if(rd != 0) {
-							if((int32_t)RegFile[rs] < (int32_t)RegFile[rt]) {
-								RegFile[rd] = 1;
-							}
-							else {
-								RegFile[rd] = 0;
-							}
-						}
+					case 0x2A: /* SLT */
+						if(rd != 0) RegFile[rd] = (s_rs < s_rt) ? 1 : 0;
 						break;
-					}
-					case 0x2B: { // R-TYPE INSTRUCTION - SLTU
-						if(rd != 0) {
-							if(RegFile[rs] < RegFile[rt]) {
-								RegFile[rd] = 1;
-							}
-							else {
-								RegFile[rd] = 0;
-							}
-						}
+					case 0x2B: /* SLTU */
+						if(rd != 0) RegFile[rd] = (u_rs < u_rt) ? 1 : 0;
 						break;
-					}
-					
-					/************************************************************************/
-					/* R-TYPE SHIFTS ------ CHLOE LIU							   			*/
-					/************************************************************************/
-					case 0x00: { // R-TYPE INSTRUCTION - SLL
-						RegFile[rd] = (int32_t)((uint32_t)RegFile[rt] << shamt);
-						break;
-					}
-					case 0x02: { // R-TYPE INSTRUCTION - SRL
-						RegFile[rd] = (int32_t)((uint32_t)RegFile[rt] >> shamt);
-						break;
-					}
-					case 0x03: { // R-TYPE INSTRUCTION - SRA
-						RegFile[rd] = RegFile[rt] >> shamt;
-						break;
-					}
-					case 0x04: { // SLLV
-						RegFile[rd] = (int32_t)((uint32_t)RegFile[rt] << (u_rs & 0x1F));
-						break;
-					}
-					case 0x06: { // R-TYPE INSTRUCTION - SRLV
-						RegFile[rd] = (int32_t)((uint32_t)RegFile[rt] >> (u_rs & 0x1F));
-						break;
-					}
-					case 0x07: { // R-TYPE INSTRUCTION - SRAV
-						RegFile[rd] = RegFile[rt] >> (u_rs & 0x1F);
-						break;
-					}
 
-					/************************************************************************/
-					/* R-TYPE MULTIPLICATION AND DIVISION ------ ULIZES ATLIXQUENO 			*/
-					/************************************************************************/
-					case 0x10: { //R-TYPE INSTRUCTION - MFHI
-						if (rd != 0) {
-							RegFile[rd] = RegFile[32];
-						}
+					/* R-TYPE SHIFTS */
+					case 0x00: /* SLL */
+						if(rd != 0) RegFile[rd] = (int32_t)(u_rt << shamt);
 						break;
-					}
-					case 0x11: { //R-TYPE INSTRUCTION - MTHI
+					case 0x02: /* SRL */
+						if(rd != 0) RegFile[rd] = (int32_t)(u_rt >> shamt);
+						break;
+					case 0x03: /* SRA */
+						if(rd != 0) RegFile[rd] = s_rt >> shamt;
+						break;
+					case 0x04: /* SLLV */
+						if(rd != 0) RegFile[rd] = (int32_t)(u_rt << (u_rs & 0x1F));
+						break;
+					case 0x06: /* SRLV */
+						if(rd != 0) RegFile[rd] = (int32_t)(u_rt >> (u_rs & 0x1F));
+						break;
+					case 0x07: /* SRAV */
+						if(rd != 0) RegFile[rd] = s_rt >> (u_rs & 0x1F);
+						break;
+
+					/* R-TYPE MULTIPLICATION AND DIVISION */
+					case 0x10: /* MFHI */
+						if(rd != 0) RegFile[rd] = RegFile[32];
+						break;
+					case 0x11: /* MTHI */
 						RegFile[32] = RegFile[rs];
 						break;
-					}
-					case 0x12: { //R-TYPE INSTRUCTION - MFLO
-						if (rd != 0) {
-							RegFile[rd] = RegFile[33];
-						}
+					case 0x12: /* MFLO */
+						if(rd != 0) RegFile[rd] = RegFile[33];
 						break;
-					}	
-					case 0x13: { //R-TYPE INSTRUCTION - MTLO
+					case 0x13: /* MTLO */
 						RegFile[33] = RegFile[rs];
 						break;
-					}	
-					case 0x18: { // R-TYPE INSTRUCTION - MULT
-						int64_t result = (int64_t)(int32_t)RegFile[rs] * (int64_t)(int32_t)RegFile[rt];
-						RegFile[32] = (uint32_t)(result >> 32);
-						RegFile[33] = (uint32_t)(result & 0xFFFFFFFF);
+					case 0x18: { /* MULT */
+						int64_t result = (int64_t)s_rs * (int64_t)s_rt;
+						RegFile[32] = (int32_t)(result >> 32);
+						RegFile[33] = (int32_t)result;
 						break;
 					}
-					case 0x19: { // R-TYPE INSTRUCTION - MULTU
-						uint64_t result = (uint64_t)(uint32_t)RegFile[rs] * (uint64_t)(uint32_t)RegFile[rt];
-						RegFile[32] = (uint32_t)(result >> 32);
-						RegFile[33] = (uint32_t)(result & 0xFFFFFFFF);
+					case 0x19: { /* MULTU */
+						uint64_t result = (uint64_t)u_rs * (uint64_t)u_rt;
+						RegFile[32] = (int32_t)(result >> 32);
+						RegFile[33] = (int32_t)result;
 						break;
 					}
-					case 0x1A: { // R-TYPE INSTRUCTION - DIV
-						if (RegFile[rt] != 0) {
-							RegFile[33] = (int32_t)RegFile[rs] / (int32_t)RegFile[rt];
-							RegFile[32] = (int32_t)RegFile[rs] % (int32_t)RegFile[rt];
+					case 0x1A: /* DIV */
+						if(RegFile[rt] != 0) {
+							RegFile[33] = s_rs / s_rt;
+							RegFile[32] = s_rs % s_rt;
 						}
 						break;
-					}
-					case 0x1B: { // R-TYPE INSTRUCTION - DIVU
-						if (RegFile[rt] != 0) {
-							RegFile[33] = (uint32_t)RegFile[rs] / (uint32_t)RegFile[rt];
-							RegFile[32] = (uint32_t)RegFile[rs] % (uint32_t)RegFile[rt];
+					case 0x1B: /* DIVU */
+						if(RegFile[rt] != 0) {
+							RegFile[33] = (int32_t)(u_rs / u_rt);
+							RegFile[32] = (int32_t)(u_rs % u_rt);
 						}
 						break;
-					}
 
-					/************************************************************************/
-					/* R-TYPE JUMP AND BRANCH ------ CHLOE LIU 					   			*/
-					/************************************************************************/
-					case 0x08: { // R-TYPE INSTRUCTION - JR
+					/* R-TYPE JUMP AND BRANCH */
+					case 0x08: /* JR */
 						branch = 1;
-						target = (uint32_t)RegFile[rs];
+						target = u_rs;
 						break;
-					}
-					case 0x09: { // R-TYPE INSTRUCTION - JALR
-						RegFile[rd] = ProgramCounter +8;
+					case 0x09: /* JALR */
+						if(rd == 0) {
+							RegFile[31] = (int32_t)(ProgramCounter + 8);
+						} else {
+							RegFile[rd] = (int32_t)(ProgramCounter + 8);
+						}
 						branch = 1;
-						target = (uint32_t)RegFile[rs];
+						target = u_rs;
 						break;
-					}
 
-					/************************************************************************/
-    				/* EXCEPTION ------ ULIZES ATLIXQUENO                     				*/
-    				/************************************************************************/
-					case 0x0C: {
-						SyscallExe(RegFile[2]);
+					/* EXCEPTIONS */
+					case 0x0C: /* SYSCALL */
+						SyscallExe((uint32_t)RegFile[2]);
 						break;
-					}
-					case 0x0D: {
-						//BREAK INSTRUCTION - NO OPERATION, TERMINATE PROGRAM
+					case 0x0D: /* BREAK */
 						printf("BREAK INSTRUCTION - 0x%08x\n", CurrentInstruction);
-						i = MaxInstructions; // Set loop counter to max to exit loop
+						printRegFile();
+						closeFDT();
+						CleanUp();
 						return 0;
-					}
+
+					default:
+						fprintf(stderr, "ERROR: Unrecognized funct 0x%02x at PC=0x%08x\n", funct, ProgramCounter);
+						i = (int)MaxInstructions;
+						break;
 				}
 				break;
 			}
 
-			/************************************************************************/
-    		/* I-TYPE LOADS AND STORES ------ CHLOE LIU                          	*/
-    		/************************************************************************/
-			case 0x20: {   // LB
-				eff_addr = u_rs + simm;
-				uint8_t val = readByte(eff_addr, false);
-
+			/* I-TYPE LOADS AND STORES */
+			case 0x20: { /* LB */
+				uint8_t val;
+				eff_addr = u_rs + (uint32_t)simm;
+				val = readByte(eff_addr, false);
 				pending = 1;
 				load_reg = rt;
 				load_val = (int32_t)(int8_t)val;
 				break;
-        	}
-			case 0x21: {   // LH
-				eff_addr = u_rs + simm;
+			}
+			case 0x21: { /* LH */
 				uint8_t byte1, byte2;
-
+				uint16_t val;
+				eff_addr = u_rs + (uint32_t)simm;
 				byte1 = readByte(eff_addr, false);
 				byte2 = readByte(eff_addr + 1, false);
-
-				uint16_t val = (byte1 << 8) | byte2;
-
+				val = (uint16_t)(((uint16_t)byte1 << 8) | (uint16_t)byte2);
 				pending = 1;
 				load_reg = rt;
 				load_val = (int32_t)(int16_t)val;
 				break;
 			}
-			case 0x22: {   // LWL
-				uint32_t aligned_addr, val, offset;
-				int32_t result;
-
-				eff_addr = u_rs + simm;
-				aligned_addr = eff_addr & ~0x3;
+			case 0x22: { /* LWL */
+				uint32_t aligned_addr, val, offset, old_rt, result;
+				eff_addr = u_rs + (uint32_t)simm;
+				aligned_addr = eff_addr & ~0x3u;
 				val = readWord(aligned_addr, false);
-				offset = eff_addr & 0x3;
-
-				if (offset == 0) {
-					result = (int32_t)val;
-				}
-				else if (offset == 1) {
-					result = (int32_t)((val << 8) | ((uint32_t)RegFile[rt] & 0x000000FF));
-				}
-				else if (offset == 2) {
-					result = (int32_t)((val << 16) | ((uint32_t)RegFile[rt] & 0x0000FFFF));
-				}
-				else {
-					result = (int32_t)((val << 24) | ((uint32_t)RegFile[rt] & 0x00FFFFFF));
-				}
-
+				offset = eff_addr & 0x3u;
+				old_rt = (uint32_t)RegFile[rt];
+				if(offset == 0)      result = val;
+				else if(offset == 1) result = (val << 8)  | (old_rt & 0x000000FFu);
+				else if(offset == 2) result = (val << 16) | (old_rt & 0x0000FFFFu);
+				else                 result = (val << 24) | (old_rt & 0x00FFFFFFu);
 				pending = 1;
 				load_reg = rt;
-				load_val = result;
+				load_val = (int32_t)result;
 				break;
 			}
-			case 0x23: {   // LW
-				eff_addr = u_rs + simm;
-
+			case 0x23: /* LW */
+				eff_addr = u_rs + (uint32_t)simm;
 				pending = 1;
 				load_reg = rt;
 				load_val = (int32_t)readWord(eff_addr, false);
 				break;
-			}
-			case 0x24: {   // LBU
-				eff_addr = u_rs + simm;
-				uint8_t val = readByte(eff_addr, false);
-
+			case 0x24: { /* LBU */
+				uint8_t val;
+				eff_addr = u_rs + (uint32_t)simm;
+				val = readByte(eff_addr, false);
 				pending = 1;
 				load_reg = rt;
-				load_val = (int32_t)val;
+				load_val = (int32_t)(uint32_t)val;
 				break;
 			}
-			case 0x25: {   // LHU
-				eff_addr = u_rs + simm;
+			case 0x25: { /* LHU */
 				uint8_t byte1, byte2;
-
+				uint16_t val;
+				eff_addr = u_rs + (uint32_t)simm;
 				byte1 = readByte(eff_addr, false);
 				byte2 = readByte(eff_addr + 1, false);
-
-				uint16_t val = (byte1 << 8) | byte2;
-
+				val = (uint16_t)(((uint16_t)byte1 << 8) | (uint16_t)byte2);
 				pending = 1;
 				load_reg = rt;
-				load_val = (int32_t)val;
+				load_val = (int32_t)(uint32_t)val;
 				break;
 			}
-			case 0x26: {   // LWR
-				uint32_t aligned_addr, val, offset;
-				int32_t result;
-
-				eff_addr = u_rs + simm;
-				aligned_addr = eff_addr & ~0x3;
+			case 0x26: { /* LWR */
+				uint32_t aligned_addr, val, offset, old_rt, result;
+				eff_addr = u_rs + (uint32_t)simm;
+				aligned_addr = eff_addr & ~0x3u;
 				val = readWord(aligned_addr, false);
-				offset = eff_addr & 0x3;
-
-				if (offset == 0) {
-					result = (int32_t)((((uint32_t)RegFile[rt]) & 0xFFFFFF00) | (val >> 24));
-				}
-				else if (offset == 1) {
-					result = (int32_t)((((uint32_t)RegFile[rt]) & 0xFFFF0000) | (val >> 16));
-				}
-				else if (offset == 2) {
-					result = (int32_t)((((uint32_t)RegFile[rt]) & 0xFF000000) | (val >> 8));
-				}
-				else {
-					result = (int32_t)val;
-				}
-
+				offset = eff_addr & 0x3u;
+				old_rt = (uint32_t)RegFile[rt];
+				if(offset == 0)      result = (old_rt & 0xFFFFFF00u) | (val >> 24);
+				else if(offset == 1) result = (old_rt & 0xFFFF0000u) | (val >> 16);
+				else if(offset == 2) result = (old_rt & 0xFF000000u) | (val >> 8);
+				else                 result = val;
 				pending = 1;
 				load_reg = rt;
-				load_val = result;
+				load_val = (int32_t)result;
 				break;
 			}
-			case 0x28: { // I-TYPE INSTRUCTION - SB
+			case 0x28: { /* SB */
 				uint8_t val;
-				eff_addr = u_rs + simm;
+				eff_addr = u_rs + (uint32_t)simm;
 				val = (uint8_t)(RegFile[rt] & 0xFF);
 				writeByte(eff_addr, val, false);
-
 				break;
-
 			}
-			case 0x29: {   // SH
+			case 0x29: { /* SH */
 				uint16_t half_val;
 				uint8_t byte1, byte2;
-
-				eff_addr = u_rs + simm;
+				eff_addr = u_rs + (uint32_t)simm;
 				half_val = (uint16_t)(RegFile[rt] & 0xFFFF);
-
 				byte1 = (uint8_t)(half_val >> 8);
 				byte2 = (uint8_t)(half_val & 0xFF);
-
-				writeByte(eff_addr, byte1, false);
+				writeByte(eff_addr,     byte1, false);
 				writeByte(eff_addr + 1, byte2, false);
-
 				break;
 			}
-			case 0x2A: {   // SWL
+			case 0x2A: { /* SWL */
 				uint32_t aligned_addr, offset, reg_val, mem_val, new_val;
-
-				eff_addr = u_rs + simm;
-				aligned_addr = eff_addr & ~0x3;
-				offset = eff_addr & 0x3;
-
+				eff_addr = u_rs + (uint32_t)simm;
+				aligned_addr = eff_addr & ~0x3u;
+				offset = eff_addr & 0x3u;
 				reg_val = (uint32_t)RegFile[rt];
 				mem_val = readWord(aligned_addr, false);
-
-				if (offset == 0) {
-					new_val = reg_val;
-				}
-				else if (offset == 1) {
-					new_val = (mem_val & 0xFF000000) | (reg_val >> 8);
-				}
-				else if (offset == 2) {
-					new_val = (mem_val & 0xFFFF0000) | (reg_val >> 16);
-				}
-				else {   // offset == 3
-					new_val = (mem_val & 0xFFFFFF00) | (reg_val >> 24);
-				}
-
+				if(offset == 0)      new_val = reg_val;
+				else if(offset == 1) new_val = (mem_val & 0xFF000000u) | (reg_val >> 8);
+				else if(offset == 2) new_val = (mem_val & 0xFFFF0000u) | (reg_val >> 16);
+				else                 new_val = (mem_val & 0xFFFFFF00u) | (reg_val >> 24);
 				writeWord(aligned_addr, new_val, false);
 				break;
 			}
-			case 0x2B: {   // SW
-				eff_addr = u_rs + simm;
+			case 0x2B: /* SW */
+				eff_addr = u_rs + (uint32_t)simm;
 				writeWord(eff_addr, (uint32_t)RegFile[rt], false);
 				break;
-			}
-			case 0x2E: {   // SWR
+			case 0x2E: { /* SWR */
 				uint32_t aligned_addr, offset, reg_val, mem_val, new_val;
-
-				eff_addr = u_rs + simm;
-				aligned_addr = eff_addr & ~0x3;
-				offset = eff_addr & 0x3;
-
+				eff_addr = u_rs + (uint32_t)simm;
+				aligned_addr = eff_addr & ~0x3u;
+				offset = eff_addr & 0x3u;
 				reg_val = (uint32_t)RegFile[rt];
 				mem_val = readWord(aligned_addr, false);
-
-				if (offset == 0) {
-					new_val = (mem_val & 0x00FFFFFF) | (reg_val << 24);
-				}
-				else if (offset == 1) {
-					new_val = (mem_val & 0x0000FFFF) | (reg_val << 16);
-				}
-				else if (offset == 2) {
-					new_val = (mem_val & 0x000000FF) | (reg_val << 8);
-				}
-				else {   // offset == 3
-					new_val = reg_val;
-				}
-
+				if(offset == 0)      new_val = (mem_val & 0x00FFFFFFu) | (reg_val << 24);
+				else if(offset == 1) new_val = (mem_val & 0x0000FFFFu) | (reg_val << 16);
+				else if(offset == 2) new_val = (mem_val & 0x000000FFu) | (reg_val << 8);
+				else                 new_val = reg_val;
 				writeWord(aligned_addr, new_val, false);
 				break;
 			}
-			
-			/************************************************************************/
-    		/* I-TYPE ALU ------ ULIZES ATLIXQUENO 									*/
-    		/************************************************************************/
-			case 0x08: { // I-TYPE INSTRUCTION - ADDI
-				if(rt != 0) {
-					RegFile[rt] = RegFile[rs] + (int32_t)simm;
-				}
-				break;
-			}
-			case 0x09: { // I-TYPE INSTRUCTION - ADDIU
-				if(rt != 0) {
-					RegFile[rt] = RegFile[rs] + (int32_t)simm;
-				}
-				break;
-			}
-			case 0x0A: { // I-TYPE INSTRUCTION - SLTI
-				if(rt != 0) {
-					if((int32_t)RegFile[rs] < (int32_t)simm) {
-						RegFile[rt] = 1;
-					}
-					else {
-						RegFile[rt] = 0;
-					}
-				}
-				break;
-			}
-			case 0x0B: { // I-TYPE INSTRUCTION - SLTIU
-				if(rt != 0) {
-					if((uint32_t)RegFile[rs] < (uint32_t)(int32_t)simm) {
-						RegFile[rt] = 1;
-					}
-					else {
-						RegFile[rt] = 0;
-					}
-				}
-				break;
-			}
-			case 0x0C: { // I-TYPE INSTRUCTION - ANDI
-				if(rt != 0) {
-					RegFile[rt] = RegFile[rs] & imm;
-				}
-				break;
-			}
-			case 0x0D: { // I-TYPE INSTRUCTION - ORI
-				if(rt != 0) {
-					RegFile[rt] = RegFile[rs] | imm;
-				}
-				break;
-			}
-			case 0x0E: { // I-TYPE INSTRUCTION - XORI
-				if(rt != 0) {
-					RegFile[rt] = RegFile[rs] ^ imm;
-				}
-				break;
-			}
-			case 0x0F: { // I-TYPE INSTRUCTION - LUI
-				if(rt != 0) {
-					RegFile[rt] = (CurrentInstruction & 0xFFFF) << 16;
-				}
-				break;
-			}
 
-			/************************************************************************/
-			/* I-TYPE JUMP AND BRANCH ------ CHLOE LIU 					   			*/
-			/************************************************************************/
-			case 0x01: { // I-TYPE JUMP AND BRANCH INSTRUCTIONS  
+			/* I-TYPE ALU */
+			case 0x08: /* ADDI */
+				if(rt != 0) RegFile[rt] = s_rs + simm;
+				break;
+			case 0x09: /* ADDIU */
+				if(rt != 0) RegFile[rt] = RegFile[rs] + simm;
+				break;
+			case 0x0A: /* SLTI */
+				if(rt != 0) RegFile[rt] = (s_rs < simm) ? 1 : 0;
+				break;
+			case 0x0B: /* SLTIU */
+				if(rt != 0) RegFile[rt] = (u_rs < (uint32_t)simm) ? 1 : 0;
+				break;
+			case 0x0C: /* ANDI */
+				if(rt != 0) RegFile[rt] = RegFile[rs] & (uint32_t)imm;
+				break;
+			case 0x0D: /* ORI */
+				if(rt != 0) RegFile[rt] = RegFile[rs] | (uint32_t)imm;
+				break;
+			case 0x0E: /* XORI */
+				if(rt != 0) RegFile[rt] = RegFile[rs] ^ (uint32_t)imm;
+				break;
+			case 0x0F: /* LUI */
+				if(rt != 0) RegFile[rt] = (int32_t)(imm << 16);
+				break;
+
+			/* I-TYPE JUMP AND BRANCH */
+			case 0x01: {
+				/* REGIMM uses the instruction rt field, not the contents of register rt. */
 				switch(rt) {
-					case 0x00: { // I-TYPE INSTRUCTION - BLTZ
-						if (RegFile[rs] < 0){
+					case 0x00: /* BLTZ */
+						if(s_rs < 0) {
 							branch = 1;
-							target = nextPC + (simm << 2);
+							target = nextPC + ((uint32_t)(simm << 2));
 						}
 						break;
-					}
-					case 0x01: { // I-TYPE INSTRUCTION - BGEZ
-						if (RegFile[rs] >= 0){
+					case 0x01: /* BGEZ */
+						if(s_rs >= 0) {
 							branch = 1;
-							target = nextPC + (simm << 2);
+							target = nextPC + ((uint32_t)(simm << 2));
 						}
 						break;
-					}
-					case 0x10: { // I-TYPE INSTRUCTION - BLTZAL
-						if (RegFile[rs] < 0){
-							RegFile[31] = ProgramCounter + 8;
+					case 0x10: /* BLTZAL */
+						if(s_rs < 0) {
+							RegFile[31] = (int32_t)(ProgramCounter + 8);
 							branch = 1;
-							target = nextPC + (simm << 2);
+							target = nextPC + ((uint32_t)(simm << 2));
 						}
 						break;
-					}
-					case 0x11: { // I-TYPE INSTRUCTION - BGEZAL
-						if (RegFile[rs] >= 0){
-							RegFile[31] = ProgramCounter + 8;
+					case 0x11: /* BGEZAL / BAL */
+						if(s_rs >= 0) {
+							RegFile[31] = (int32_t)(ProgramCounter + 8);
 							branch = 1;
-							target = nextPC + (simm << 2);
+							target = nextPC + ((uint32_t)(simm << 2));
 						}
 						break;
-					}
+					default:
+						fprintf(stderr, "ERROR: Unrecognized REGIMM rt=0x%02x at PC=0x%08x\n", rt, ProgramCounter);
+						i = (int)MaxInstructions;
+						break;
 				}
 				break;
 			}
-			case 0x04: { // I-TYPE INSTRUCTION - BEQ
-				if (RegFile[rs] == RegFile[rt]){
+			case 0x04: /* BEQ */
+				if(RegFile[rs] == RegFile[rt]) {
 					branch = 1;
-					target = nextPC + (simm << 2);
+					target = nextPC + ((uint32_t)(simm << 2));
 				}
 				break;
-			}
-			case 0x05: { // I-TYPE INSTRUCTION - BNE
-				if (RegFile[rs] != RegFile[rt]){
+			case 0x05: /* BNE */
+				if(RegFile[rs] != RegFile[rt]) {
 					branch = 1;
-					target = nextPC + (simm << 2);
+					target = nextPC + ((uint32_t)(simm << 2));
 				}
 				break;
-			}
-			case 0x06: { // I-TYPE INSTRUCTION - BLEZ
-				if (RegFile[rs] <= 0){
+			case 0x06: /* BLEZ */
+				if(s_rs <= 0) {
 					branch = 1;
-					target = nextPC + (simm << 2);
+					target = nextPC + ((uint32_t)(simm << 2));
 				}
 				break;
-			}
-			case 0x07: { // I-TYPE INSTRUCTION - BGTZ
-				if (RegFile[rs] > 0){
+			case 0x07: /* BGTZ */
+				if(s_rs > 0) {
 					branch = 1;
-					target = nextPC + (simm << 2);
+					target = nextPC + ((uint32_t)(simm << 2));
 				}
 				break;
-			}
 
-			/************************************************************************/
-			/* J-TYPE JUMP AND BRANCH ------ CHLOE LIU 					   			*/
-			/************************************************************************/
-			case 0x02: { // J-TYPE INSTRUCTION - J
+			/* J-TYPE JUMPS */
+			case 0x02: /* J */
 				branch = 1;
-				target = (nextPC & 0xF0000000) | (addr << 2);
+				target = (nextPC & 0xF0000000u) | (addr << 2);
 				break;
-			}
-			case 0x03: { // J-TYPE INSTRUCTION - JAL
-				RegFile[31] = ProgramCounter + 8;
+			case 0x03: /* JAL */
+				RegFile[31] = (int32_t)(ProgramCounter + 8);
 				branch = 1;
-				target = (nextPC & 0xF0000000) | (addr << 2);
+				target = (nextPC & 0xF0000000u) | (addr << 2);
 				break;
-			}
 
-			default: {
+			default:
 				fprintf(stderr, "ERROR: Unrecognized opcode 0x%02x at PC=0x%08x\n", opcode, ProgramCounter);
-				i = MaxInstructions; // Set loop counter to max to exit loop
-			}
+				i = (int)MaxInstructions;
+				break;
 		}
-		//load delay slot
+
+		/* load delay slot */
 		if (apply_load && apply_load_reg != 0) {
 			RegFile[apply_load_reg] = apply_load_value;
 		}
-		
+
+		/* register $zero is always 0 */
 		RegFile[0] = 0;
 
-		//branch delay slot
-		if (delay_branch){
+		/* branch delay slot */
+		if (delay_branch) {
 			ProgramCounter = delay_target;
-		}
-		else {
+		} else {
 			ProgramCounter = nextPC;
 		}
 	}
-	//Print the final contents of the register file
+
+	/* Print the final contents of the register file */
 	printRegFile();
-	//Close file pointers & free allocated Memory
+
+	/* Close file pointers & free allocated Memory */
 	closeFDT();
 	CleanUp();
 
