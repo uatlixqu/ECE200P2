@@ -111,18 +111,22 @@ int main(int argc, char * argv[]) {
 		//Print contents of the register file after each instruction
 		
 		//printRegFile();//only suggested for Debug, comment this line to reduce output
-		if (ProgramCounter == 0x00400010 ||
-    ProgramCounter == 0x00400018 ||
-    ProgramCounter == 0x00400040 ||
-    ProgramCounter == 0x00400044 ||
-    ProgramCounter == 0x00400058 ||
-    ProgramCounter == 0x00400060 ||
-    ProgramCounter == 0x00400064 ||
-    ProgramCounter == 0x00400068) {
-    printf("pc=%08x instr=%08x | r1=%u r2=%u r3=%u r4=%u r6=%u r8=%u r19=%u hi=%u lo=%u\n",
-           ProgramCounter, CurrentInstruction,
+		if ((opcode == 0x08) ||                          /* ADDI */
+    (opcode == 0x00 && funct == 0x20) ||        /* ADD  */
+    (opcode == 0x00 && funct == 0x22) ||        /* SUB  */
+    (opcode == 0x00 && funct == 0x26) ||        /* XOR  */
+    (opcode == 0x00 && funct == 0x00) ||        /* SLL  */
+    (opcode == 0x00 && funct == 0x02) ||        /* SRL  */
+    (opcode == 0x00 && funct == 0x18) ||        /* MULT */
+    (opcode == 0x00 && funct == 0x1A) ||        /* DIV  */
+    (opcode == 0x00 && funct == 0x12) ||        /* MFLO */
+    (opcode == 0x00 && funct == 0x10)) {        /* MFHI */
+
+    printf("PC=%08x op=%02x fn=%02x | r1=%u r2=%u r3=%u r4=%u r6=%u r8=%u r9=%u r19=%u hi=%u lo=%u\n",
+           ProgramCounter, opcode, funct,
            RegFile[1], RegFile[2], RegFile[3], RegFile[4],
-           RegFile[6], RegFile[8], RegFile[19], RegFile[32], RegFile[33]);
+           RegFile[6], RegFile[8], RegFile[9], RegFile[19],
+           RegFile[32], RegFile[33]);
 }
 		/********************************/
 		/* ADD YOUR IMPLEMENTATION HERE */
